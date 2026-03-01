@@ -130,6 +130,7 @@ Local<FunctionTemplate> Widget::GetConstructorTemplate(IsolateData* isolate_data
     SetProtoMethod(isolate, tmpl, "off", Off);
     SetProtoMethod(isolate, tmpl, "destroy", Destroy);
     SetProtoProperty(isolate, tmpl, "visible", VisibleGetter, VisibleSetter);
+    SetProtoProperty(isolate, tmpl, "label", LabelGetter, LabelSetter);
 
     isolate_data->set_widget_constructor_template(tmpl);
   }
