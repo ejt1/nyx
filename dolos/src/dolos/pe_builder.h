@@ -5,14 +5,15 @@
 #include <vector>
 
 #include <windows.h>
+#include <Zydis/Zydis.h>
 
 namespace dolos {
 
 struct SectionInfo {
   char name[8];
-  std::uint32_t virtual_address;  // RVA from module base
+  std::uint32_t virtual_address;
   std::uint32_t virtual_size;
-  std::uint32_t characteristics;  // Section characteristics (IMAGE_SCN_*)
+  std::uint32_t characteristics;
 };
 
 class PEBuilder {
@@ -30,6 +31,11 @@ class PEBuilder {
   static std::uint32_t MapProtectionToCharacteristics(DWORD protect);
 
   static void DeriveSectionName(SectionInfo& sec, std::size_t index);
+
+  static std::size_t DeobfuscateIAT(std::vector<std::uint8_t>& buffer,
+                                     std::uint64_t image_base,
+                                     std::uint64_t aslr_base,
+                                     std::uint64_t image_size);
 
  private:
   void BuildDosHeader(std::vector<std::uint8_t>& out);
