@@ -37,7 +37,7 @@ static std::unique_ptr<v8::Platform> platform_;
 static std::atomic<uv_async_t*> shutdown_handle_{nullptr};
 static std::atomic<bool> running_{false};
 static std::atomic<bool> restart_requested_{false};
-static std::string scripts_root_;
+static std::string nyx_cwd_;
 
 static FILE* g_stdout_{stdout};
 static FILE* g_stderr_{stderr};
@@ -151,9 +151,9 @@ int Start(NyxImGui* nyx_imgui, GameLock* game_lock) {
         Isolate::Scope isolate_scope(isolate);
         HandleScope handle_scope(isolate);
 
-        Environment env(isolate_data, isolate, scripts_root_, nyx_imgui, game_lock);
+        Environment env(isolate_data, isolate, nyx_cwd_, nyx_imgui, game_lock);
         Realm* realm = env.principal_realm();
-        realm->ExecuteBootstrapper("internal/main/run_packages");
+        realm->ExecuteBootstrapper("internal/main/run_nyx");
         SpinEventLoop(&env);
 
         nyx_imgui->ClearDrawData();
@@ -198,8 +198,8 @@ bool IsRunning() {
   return running_.load(std::memory_order_acquire);
 }
 
-void SetScriptDirectory(const std::string& path) {
-  scripts_root_ = path;
+void SetCwd(const std::string& path) {
+  nyx_cwd_ = path;
 }
 
 }  // namespace nyx

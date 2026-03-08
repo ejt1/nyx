@@ -35,6 +35,6 @@ void Teardown();
 // Check if nyx is currently running (Start has been called and hasn't returned).
 bool IsRunning();
 
-void SetScriptDirectory(const std::string& path);
+void SetCwd(const std::string& path);
 
 }  // namespace nyx

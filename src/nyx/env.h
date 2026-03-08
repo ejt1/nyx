@@ -26,7 +26,7 @@ class Environment {
  public:
   Environment(IsolateData* isolate_data,
               v8::Isolate* isolate,
-              const std::string_view script_path,
+              const std::string_view nyx_cwd,
               NyxImGui* nyx_imgui,
               GameLock* game_lock = nullptr);
   ~Environment();
@@ -63,6 +63,7 @@ class Environment {
   ModuleWrap* GetModuleWrap(int identity_hash) const;
   ModuleWrap* GetModuleWrap(v8::Local<v8::Module> module) const;
 
+  const std::string& nyx_cwd() const { return nyx_cwd_; }
   const std::string& scripts_root() const { return scripts_root_; }
   void set_scripts_root(const std::string& root) { scripts_root_ = root; }
 
@@ -99,6 +100,7 @@ class Environment {
   std::unique_ptr<ImGuiDrawContext> draw_context_;
   std::unique_ptr<WidgetManager> widget_manager_;
   std::unordered_map<int, ModuleWrap*> module_registry_;
+  std::string nyx_cwd_;
   std::string scripts_root_;
 };
 

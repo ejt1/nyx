@@ -84,11 +84,26 @@ static void SetScriptsRoot(const FunctionCallbackInfo<Value>& args) {
   args.GetReturnValue().SetUndefined();
 }
 
+static void NyxCwd(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  Environment* env = Environment::GetCurrent(isolate);
+
+  const std::string& cwd = env->nyx_cwd();
+  if (cwd.empty()) {
+    args.GetReturnValue().SetUndefined();
+    return;
+  }
+
+  Local<String> result = OneByteString(isolate, cwd.c_str(), static_cast<int>(cwd.size()));
+  args.GetReturnValue().Set(result);
+}
+
 static void CreatePerIsolateProperties(IsolateData* isolate_data, Local<ObjectTemplate> target) {
   Isolate* isolate = isolate_data->isolate();
 
   SetMethod(isolate, target, "cwd", Cwd);
   SetMethod(isolate, target, "chdir", Chdir);
+  SetMethod(isolate, target, "nyxCwd", NyxCwd);
   SetMethod(isolate, target, "scriptsRoot", ScriptsRoot);
   SetMethod(isolate, target, "setScriptsRoot", SetScriptsRoot);
 }

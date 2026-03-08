@@ -174,6 +174,7 @@ DWORD CALLBACK ThreadEntry(LPVOID lpParameter) {
     PIPE_LOG_WARN("[dolos] Game::OnInitialize failed");
   }
 
+  nyx::SetCwd(module_cwd_);
   nyx::RegisterBinding("dolos", InitDolosBinding);
   dolos_builtins::RegisterBuiltins();
 

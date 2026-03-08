@@ -16,14 +16,14 @@ using v8::Value;
 
 Environment::Environment(IsolateData* isolate_data,
                          v8::Isolate* isolate,
-                         const std::string_view script_path,
+                         const std::string_view nyx_cwd,
                          NyxImGui* nyx_imgui,
                          GameLock* game_lock)
     : isolate_data_(isolate_data),
       isolate_(isolate),
       nyx_imgui_(nyx_imgui),
       game_lock_(game_lock),
-      scripts_root_(script_path) {
+      nyx_cwd_(nyx_cwd) {
   Isolate::Scope isolate_scope(isolate_);
 
   // Must exist before bootstrapping so timer binding callbacks can access it.
