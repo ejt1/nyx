@@ -25,6 +25,8 @@ class PEBuilder {
 
   bool WriteExecutable(const std::vector<std::uint8_t>& raw_buffer, const std::string& path);
 
+  static bool WriteMemoryDump(const std::vector<std::uint8_t>& buffer, const std::string& path);
+
   static std::uint32_t MapProtectionToCharacteristics(DWORD protect);
 
   static void DeriveSectionName(SectionInfo& sec, std::size_t index);

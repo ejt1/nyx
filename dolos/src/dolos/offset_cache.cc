@@ -41,6 +41,9 @@ OffsetCacheManager::OffsetCacheManager() {
   cache_dir_ = (exe_dir / "cache" / "offsets").string();
 }
 
+OffsetCacheManager::OffsetCacheManager(const std::string& cache_dir)
+    : cache_dir_(cache_dir) {}
+
 std::uint64_t OffsetCacheManager::ComputeExecutableHash() {
   char path[MAX_PATH];
   GetModuleFileNameA(nullptr, path, MAX_PATH);
@@ -113,6 +116,10 @@ std::string OffsetCacheManager::GetCachePath(std::uint64_t exe_hash) {
   std::ostringstream ss;
   ss << cache_dir_ << "/" << std::hex << std::setfill('0') << std::setw(16) << exe_hash << ".bin";
   return ss.str();
+}
+
+std::string OffsetCacheManager::GetCachePath(const std::string& filename) {
+  return cache_dir_ + "/" + filename;
 }
 
 bool OffsetCacheManager::EnsureCacheDirectory() {
@@ -210,11 +217,14 @@ std::optional<OffsetCache> OffsetCacheManager::LoadCache(std::uint64_t expected_
 }
 
 bool OffsetCacheManager::SaveCache(const OffsetCache& cache) {
-  if (!EnsureCacheDirectory()) {
-    return false;
-  }
+  return SaveCacheTo(cache, GetCachePath(cache.exe_hash));
+}
 
-  std::string cache_path = GetCachePath(cache.exe_hash);
+bool OffsetCacheManager::SaveCacheTo(const OffsetCache& cache, const std::string& cache_path) {
+  std::size_t last_slash = cache_path.find_last_of("/\\");
+  if (last_slash != std::string::npos) {
+    std::filesystem::create_directories(cache_path.substr(0, last_slash));
+  }
 
   std::ofstream file(cache_path, std::ios::binary | std::ios::trunc);
   if (!file) {

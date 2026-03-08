@@ -232,4 +232,188 @@ bool PEBuilder::WriteExecutable(const std::vector<std::uint8_t>& raw_buffer, con
   return true;
 }
 
+bool PEBuilder::WriteMemoryDump(const std::vector<std::uint8_t>& buffer, const std::string& path) {
+  if (buffer.size() < sizeof(IMAGE_DOS_HEADER)) {
+    PIPE_LOG_ERROR("[PEBuilder] Buffer too small for DOS header");
+    return false;
+  }
+
+  const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(buffer.data());
+  if (dos->e_magic != IMAGE_DOS_SIGNATURE) {
+    PIPE_LOG_ERROR("[PEBuilder] Invalid DOS signature");
+    return false;
+  }
+
+  std::size_t nt_offset = dos->e_lfanew;
+  if (nt_offset + sizeof(IMAGE_NT_HEADERS64) > buffer.size()) {
+    PIPE_LOG_ERROR("[PEBuilder] NT headers beyond buffer");
+    return false;
+  }
+
+  const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(buffer.data() + nt_offset);
+  if (nt->Signature != IMAGE_NT_SIGNATURE) {
+    PIPE_LOG_ERROR("[PEBuilder] Invalid NT signature");
+    return false;
+  }
+
+  WORD num_sections = nt->FileHeader.NumberOfSections;
+  std::size_t section_offset = nt_offset + sizeof(DWORD) + sizeof(IMAGE_FILE_HEADER) +
+                               nt->FileHeader.SizeOfOptionalHeader;
+  if (section_offset + num_sections * sizeof(IMAGE_SECTION_HEADER) > buffer.size()) {
+    PIPE_LOG_ERROR("[PEBuilder] Section headers beyond buffer");
+    return false;
+  }
+
+  std::vector<std::uint8_t> output(buffer);
+
+  auto* out_nt = reinterpret_cast<IMAGE_NT_HEADERS64*>(output.data() + nt_offset);
+
+  {
+    std::uint64_t aslr_base = out_nt->OptionalHeader.ImageBase;
+    std::uint64_t orig_base = aslr_base;
+
+    char exe_path[MAX_PATH];
+    GetModuleFileNameA(nullptr, exe_path, MAX_PATH);
+    HANDLE hFile = CreateFileA(exe_path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+    if (hFile != INVALID_HANDLE_VALUE) {
+      IMAGE_DOS_HEADER disk_dos{};
+      DWORD bytes_read = 0;
+      if (ReadFile(hFile, &disk_dos, sizeof(disk_dos), &bytes_read, nullptr) &&
+          bytes_read == sizeof(disk_dos) && disk_dos.e_magic == IMAGE_DOS_SIGNATURE) {
+        SetFilePointer(hFile, disk_dos.e_lfanew, nullptr, FILE_BEGIN);
+        IMAGE_NT_HEADERS64 disk_nt{};
+        if (ReadFile(hFile, &disk_nt, sizeof(disk_nt), &bytes_read, nullptr) &&
+            bytes_read == sizeof(disk_nt) && disk_nt.Signature == IMAGE_NT_SIGNATURE) {
+          orig_base = disk_nt.OptionalHeader.ImageBase;
+        }
+      }
+      CloseHandle(hFile);
+    }
+
+    if (aslr_base != orig_base) {
+      std::int64_t delta = static_cast<std::int64_t>(aslr_base) - static_cast<std::int64_t>(orig_base);
+
+      PIPE_LOG_DEBUG("[PEBuilder] Rebasing ImageBase from 0x{:X} to 0x{:X} (delta=0x{:X})",
+                     aslr_base, orig_base, delta);
+      out_nt->OptionalHeader.ImageBase = orig_base;
+
+      // Rebase read-only sections (.rdata) using the reloc table
+      auto* sec_hdrs = reinterpret_cast<const IMAGE_SECTION_HEADER*>(output.data() + section_offset);
+      auto is_readonly_rva = [&](std::size_t rva) -> bool {
+        for (WORD s = 0; s < num_sections; ++s) {
+          if (rva >= sec_hdrs[s].VirtualAddress &&
+              rva < sec_hdrs[s].VirtualAddress + sec_hdrs[s].Misc.VirtualSize) {
+            return !(sec_hdrs[s].Characteristics & IMAGE_SCN_MEM_WRITE);
+          }
+        }
+        return false;
+      };
+
+      auto& reloc_dir = out_nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
+      std::size_t reloc_fixups = 0;
+      if (reloc_dir.VirtualAddress != 0 && reloc_dir.Size != 0) {
+        std::size_t reloc_rva = reloc_dir.VirtualAddress;
+        std::size_t reloc_end = reloc_rva + reloc_dir.Size;
+
+        while (reloc_rva + sizeof(IMAGE_BASE_RELOCATION) <= reloc_end && reloc_rva < output.size()) {
+          auto* block = reinterpret_cast<IMAGE_BASE_RELOCATION*>(output.data() + reloc_rva);
+          if (block->SizeOfBlock < sizeof(IMAGE_BASE_RELOCATION) || block->SizeOfBlock > reloc_end - reloc_rva) {
+            break;
+          }
+
+          DWORD entry_count = (block->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof(WORD);
+          auto* entries = reinterpret_cast<WORD*>(
+              output.data() + reloc_rva + sizeof(IMAGE_BASE_RELOCATION));
+
+          for (DWORD j = 0; j < entry_count; ++j) {
+            WORD type = entries[j] >> 12;
+            WORD offset = entries[j] & 0xFFF;
+            std::size_t target_rva = block->VirtualAddress + offset;
+
+            if (type == IMAGE_REL_BASED_DIR64 && target_rva + 8 <= output.size() &&
+                is_readonly_rva(target_rva)) {
+              auto* ptr = reinterpret_cast<std::uint64_t*>(output.data() + target_rva);
+              *ptr -= delta;
+              ++reloc_fixups;
+            } else if (type == IMAGE_REL_BASED_HIGHLOW && target_rva + 4 <= output.size() &&
+                       is_readonly_rva(target_rva)) {
+              auto* ptr = reinterpret_cast<std::uint32_t*>(output.data() + target_rva);
+              *ptr -= static_cast<std::uint32_t>(delta);
+              ++reloc_fixups;
+            }
+          }
+
+          reloc_rva += block->SizeOfBlock;
+        }
+      }
+
+      // Heuristic rebase of writable sections (.data)
+      std::size_t heuristic_fixups = 0;
+      std::uint64_t aslr_lo = aslr_base;
+      std::uint64_t aslr_hi = aslr_base + out_nt->OptionalHeader.SizeOfImage;
+
+      for (WORD s = 0; s < num_sections; ++s) {
+        if (!(sec_hdrs[s].Characteristics & IMAGE_SCN_MEM_WRITE)) continue;
+
+        std::size_t sec_start = sec_hdrs[s].VirtualAddress;
+        std::size_t sec_end = sec_start + sec_hdrs[s].Misc.VirtualSize;
+        if (sec_end > output.size()) sec_end = output.size();
+
+        for (std::size_t off = sec_start; off + 8 <= sec_end; off += 8) {
+          auto* ptr = reinterpret_cast<std::uint64_t*>(output.data() + off);
+          if (*ptr >= aslr_lo && *ptr < aslr_hi) {
+            *ptr -= delta;
+            ++heuristic_fixups;
+          }
+        }
+      }
+
+      PIPE_LOG_DEBUG("[PEBuilder] Rebase: {} reloc fixups, {} heuristic .data fixups",
+                     reloc_fixups, heuristic_fixups);
+    }
+  }
+
+  // Remove ASLR flag
+  out_nt->OptionalHeader.DllCharacteristics &= ~IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE;
+
+  auto* sections = reinterpret_cast<IMAGE_SECTION_HEADER*>(output.data() + section_offset);
+  for (WORD i = 0; i < num_sections; ++i) {
+    sections[i].PointerToRawData = sections[i].VirtualAddress;
+    sections[i].SizeOfRawData = AlignUp(sections[i].Misc.VirtualSize,
+                                        out_nt->OptionalHeader.SectionAlignment);
+  }
+
+  auto& debug_dir = out_nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
+  if (debug_dir.VirtualAddress != 0 && debug_dir.Size >= sizeof(IMAGE_DEBUG_DIRECTORY) &&
+      debug_dir.VirtualAddress + debug_dir.Size <= output.size()) {
+    std::size_t count = debug_dir.Size / sizeof(IMAGE_DEBUG_DIRECTORY);
+    auto* entries = reinterpret_cast<IMAGE_DEBUG_DIRECTORY*>(output.data() + debug_dir.VirtualAddress);
+    for (std::size_t i = 0; i < count; ++i) {
+      entries[i].PointerToRawData = entries[i].AddressOfRawData;
+    }
+    PIPE_LOG_DEBUG("[PEBuilder] Patched {} debug directory entries", count);
+  }
+
+  std::size_t last_slash = path.find_last_of("/\\");
+  if (last_slash != std::string::npos) {
+    std::filesystem::create_directories(path.substr(0, last_slash));
+  }
+
+  std::ofstream file(path, std::ios::binary | std::ios::trunc);
+  if (!file) {
+    PIPE_LOG_ERROR("[PEBuilder] Failed to create output file: {}", path);
+    return false;
+  }
+
+  file.write(reinterpret_cast<const char*>(output.data()), output.size());
+  if (!file) {
+    PIPE_LOG_ERROR("[PEBuilder] Failed to write output file");
+    return false;
+  }
+
+  PIPE_LOG_DEBUG("[PEBuilder] Wrote memory dump PE ({} sections, {} bytes) to {}",
+                 num_sections, output.size(), path);
+  return true;
+}
+
 }  // namespace dolos

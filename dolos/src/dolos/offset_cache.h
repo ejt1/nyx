@@ -40,6 +40,7 @@ struct OffsetCache {
 class OffsetCacheManager {
  public:
   OffsetCacheManager();
+  explicit OffsetCacheManager(const std::string& cache_dir);
 
   std::uint64_t ComputeExecutableHash();
   std::uint32_t ComputeSignatureHash(const std::vector<SignatureDef>& signatures);
@@ -53,8 +54,10 @@ class OffsetCacheManager {
   std::optional<OffsetCache> LoadCache(std::uint64_t expected_exe_hash, std::uint32_t expected_sig_hash);
 
   bool SaveCache(const OffsetCache& cache);
+  bool SaveCacheTo(const OffsetCache& cache, const std::string& path);
 
   std::string GetCachePath(std::uint64_t exe_hash);
+  std::string GetCachePath(const std::string& filename);
   bool EnsureCacheDirectory();
 
  private:
