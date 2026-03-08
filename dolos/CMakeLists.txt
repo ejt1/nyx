@@ -22,7 +22,7 @@ target_external_js_sources(dolos lib ${CMAKE_CURRENT_BINARY_DIR}/dolos_builtins.
 
 target_include_directories(dolos PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_include_directories(dolos PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(dolos PUBLIC nyx::nyx imgui lazy_importer minhook spdlog shlwapi)
+target_link_libraries(dolos PUBLIC nyx::nyx imgui lazy_importer minhook spdlog shlwapi Zydis)
 target_compile_definitions(dolos PUBLIC SPDLOG_ACTIVE_LEVEL=1 WIN32_LEAN_AND_MEAN)
 
 install(
