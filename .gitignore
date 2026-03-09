@@ -1,14 +1,19 @@
 # Directories
 .vs
 out
+build
 enc_temp_folder
+.vscode
 
 # Files
 *.user
+_cmd_test.log
+configure-*.log
 
 ## Ignore Visual Studio solution/project files
 *.sln
 *.vcxproj*
+CMakeSettings.json
 
 *.pyc
 *.lib

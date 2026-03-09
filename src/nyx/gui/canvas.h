@@ -25,6 +25,7 @@ class Canvas : public BaseObject {
     ImDrawFlags draw_flags = 0;
     int segments = 0;
     std::string text;
+    float font_size = 0.f;
   };
 
   Canvas(Realm* realm, v8::Local<v8::Object> object);

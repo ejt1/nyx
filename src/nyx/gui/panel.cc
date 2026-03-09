@@ -32,6 +32,7 @@ void PanelWidget::Initialize(IsolateData* isolate_data, Local<ObjectTemplate> ta
   SetProtoProperty(isolate, tmpl, "open", GetOpen, SetOpen);
   SetProtoProperty(isolate, tmpl, "title", GetTitle, SetTitle);
   SetProtoProperty(isolate, tmpl, "flags", GetFlags, SetFlags);
+  SetProtoProperty(isolate, tmpl, "visible", GetVisible, nullptr);
   SetProtoProperty(isolate, tmpl, "canvas", GetCanvas, nullptr);
 
   tmpl->SetClassName(FixedOneByteString(isolate, "Panel"));
@@ -92,6 +93,11 @@ void PanelWidget::SetFlags(const FunctionCallbackInfo<Value>& args) {
   }
 }
 
+void PanelWidget::GetVisible(const FunctionCallbackInfo<Value>& args) {
+  PanelWidget* self = BaseObject::Unwrap<PanelWidget>(args.This());
+  if (self) args.GetReturnValue().Set(self->panel_visible());
+}
+
 void PanelWidget::GetCanvas(const FunctionCallbackInfo<Value>& args) {
   PanelWidget* self = BaseObject::Unwrap<PanelWidget>(args.This());
   if (!self) return;
@@ -109,7 +115,10 @@ void PanelWidget::GetCanvas(const FunctionCallbackInfo<Value>& args) {
 }
 
 void PanelWidget::Render() {
-  if (!open_) return;
+  if (!open_) {
+    panel_visible_ = false;
+    return;
+  }
 
   bool was_open = open_;
   panel_visible_ = ImGui::Begin(title_.c_str(), &open_, flags_);

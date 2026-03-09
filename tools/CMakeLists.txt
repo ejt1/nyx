@@ -7,9 +7,9 @@ function(target_js_sources TARGET DIRECTORY OUTPUT_CC)
 
   add_custom_command(
     OUTPUT ${OUTPUT_CC}
-    COMMAND js2c
+    COMMAND $<TARGET_FILE:js2c>
     ARGS --root ${CMAKE_CURRENT_SOURCE_DIR} ${OUTPUT_CC} ${DIRECTORY}
-    DEPENDS ${JS_FILES}
+    DEPENDS js2c ${JS_FILES}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Generating ${OUTPUT_CC} from JavaScript files..."
     VERBATIM
@@ -29,9 +29,9 @@ function(target_external_js_sources TARGET DIRECTORY OUTPUT_CC NAMESPACE)
 
   add_custom_command(
     OUTPUT ${OUTPUT_CC} ${OUTPUT_H}
-    COMMAND js2c
+    COMMAND $<TARGET_FILE:js2c>
     ARGS --root ${CMAKE_CURRENT_SOURCE_DIR} --external --namespace ${NAMESPACE} ${OUTPUT_CC} ${DIRECTORY}
-    DEPENDS ${JS_FILES}
+    DEPENDS js2c ${JS_FILES}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Generating ${OUTPUT_CC} and ${OUTPUT_H} from JavaScript files..."
     VERBATIM

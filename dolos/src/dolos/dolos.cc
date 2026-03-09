@@ -204,10 +204,33 @@ DWORD CALLBACK ThreadEntry(LPVOID lpParameter) {
     }
   }
 
+  // Poll the pipe for show/hide commands sent by the injector and toggle the
+  // imgui visibility flag accordingly.
+  std::atomic<bool> cmd_thread_running{true};
+  std::thread cmd_thread([&]() {
+    while (cmd_thread_running) {
+      std::string cmd;
+      if (PollPipeCommand(cmd)) {
+        if (cmd == "hide") {
+          nyx_imgui.set_visible(false);
+          nyx_imgui.ClearDrawData();
+          PIPE_LOG("[dolos] UI hidden by injector");
+        } else if (cmd == "show") {
+          nyx_imgui.set_visible(true);
+          PIPE_LOG("[dolos] UI shown by injector");
+        }
+      }
+      Sleep(50);
+    }
+  });
+
   if (renderer.Initialize() && window.Initialize()) {
     PIPE_LOG("[dolos] Starting nyx runtime...");
     nyx::Start(&nyx_imgui, &game_lock);
   }
+
+  cmd_thread_running = false;
+  if (cmd_thread.joinable()) cmd_thread.join();
 
   pipe_redirect.Stop();
 

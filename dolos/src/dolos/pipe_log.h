@@ -60,6 +60,28 @@ class pipe_sink : public spdlog::sinks::base_sink<Mutex> {
 
   bool is_connected() const { return connected_; }
 
+  // Non-blocking read of a single command sent by the injector.
+  // Returns true and sets `cmd` (trimmed) when a message is available.
+  bool PollCommand(std::string& cmd) {
+    if (!connected_ || pipe_ == INVALID_HANDLE_VALUE) return false;
+    DWORD available = 0;
+    if (!PeekNamedPipe(pipe_, nullptr, 0, nullptr, &available, nullptr) || available == 0) {
+      return false;
+    }
+    char buf[256]{};
+    DWORD read = 0;
+    if (!ReadFile(pipe_, buf, std::min<DWORD>(available, static_cast<DWORD>(sizeof(buf) - 1)),
+                  &read, nullptr) || read == 0) {
+      return false;
+    }
+    cmd.assign(buf, read);
+    while (!cmd.empty() &&
+           (cmd.back() == '\n' || cmd.back() == '\r' || cmd.back() == ' ')) {
+      cmd.pop_back();
+    }
+    return !cmd.empty();
+  }
+
  protected:
   void sink_it_(const spdlog::details::log_msg& msg) override {
     if (!connected_ || pipe_ == INVALID_HANDLE_VALUE) {
@@ -99,6 +121,9 @@ bool InitializePipeLog(const std::string& logger_name = "dolos");
 void ShutdownPipeLog();
 
 bool IsPipeLogConnected();
+
+// Non-blocking poll: returns true and fills `cmd` when the injector has sent a command.
+bool PollPipeCommand(std::string& cmd);
 
 }  // namespace dolos
 

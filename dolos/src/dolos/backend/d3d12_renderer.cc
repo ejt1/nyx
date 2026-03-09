@@ -242,25 +242,27 @@ HRESULT D3D12Renderer::Present(IDXGISwapChain* self, UINT SyncInterval, UINT Fla
       command_list_->SetDescriptorHeaps(1, srv_heap_.GetAddressOf());
 
       // TODO: move background drawlist to a game hook instead to be drawn under GUI
-      {
-        auto* bg = nyx_imgui_->background();
-        ImDrawData* data = bg->Acquire();
-        if (data) {
-          if (data->Valid) {
-            imgui_.RenderDrawData(data, command_list_.Get());
+      if (nyx_imgui_->visible()) {
+        {
+          auto* bg = nyx_imgui_->background();
+          ImDrawData* data = bg->Acquire();
+          if (data) {
+            if (data->Valid) {
+              imgui_.RenderDrawData(data, command_list_.Get());
+            }
+            bg->Release();
           }
-          bg->Release();
         }
-      }
 
-      {
-        auto* fg = nyx_imgui_->foreground();
-        ImDrawData* data = fg->Acquire();
-        if (data) {
-          if (data->Valid) {
-            imgui_.RenderDrawData(data, command_list_.Get());
+        {
+          auto* fg = nyx_imgui_->foreground();
+          ImDrawData* data = fg->Acquire();
+          if (data) {
+            if (data->Valid) {
+              imgui_.RenderDrawData(data, command_list_.Get());
+            }
+            fg->Release();
           }
-          fg->Release();
         }
       }
 

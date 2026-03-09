@@ -386,7 +386,7 @@ declare module 'gui' {
     addRectFilled(key: string, min: ImVec2, max: ImVec2, color: number, rounding?: number, flags?: number): undefined;
     addCircle(key: string, center: ImVec2, radius: number, color: number, segments?: number, thickness?: number): undefined;
     addCircleFilled(key: string, center: ImVec2, radius: number, color: number, segments?: number): undefined;
-    addText(key: string, pos: ImVec2, color: number, text: string): undefined;
+    addText(key: string, pos: ImVec2, color: number, text: string, fontSize?: number): undefined;
 
     remove(key: string): undefined;
     clear(): undefined;

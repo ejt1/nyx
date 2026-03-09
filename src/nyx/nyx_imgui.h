@@ -40,6 +40,11 @@ class NyxImGui {
   bool WantCaptureMouse() const;
   bool WantCaptureKeyboard() const;
 
+  // Controls whether imgui draw data is rendered. When false the renderer skips
+  // all imgui submission so background instances have no visible overlay.
+  void set_visible(bool v) { visible_.store(v, std::memory_order_relaxed); }
+  bool visible() const { return visible_.load(std::memory_order_relaxed); }
+
  private:
   ImGuiDrawDataStore foreground_;
   ImGuiDrawDataStore background_;
@@ -49,6 +54,7 @@ class NyxImGui {
   ImGuiContext* game_context_ = nullptr;
   std::atomic<bool> want_capture_mouse_{false};
   std::atomic<bool> want_capture_keyboard_{false};
+  std::atomic<bool> visible_{true};
 };
 
 }  // namespace nyx

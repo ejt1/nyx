@@ -180,6 +180,9 @@ void Canvas::AddText(const FunctionCallbackInfo<Value>& args) {
   prim.color = args[2]->Uint32Value(ctx).FromMaybe(IM_COL32_WHITE);
   Utf8Value text(isolate, args[3]);
   prim.text = *text;
+  if (args.Length() > 4) {
+    prim.font_size = static_cast<float>(args[4]->NumberValue(ctx).FromMaybe(0.0));
+  }
 
   self->primitives_[*key] = prim;
 }
@@ -226,7 +229,11 @@ void Canvas::Render(ImDrawList* draw_list, ImVec2 offset) {
         draw_list->AddCircleFilled(p1, p.radius, p.color, p.segments);
         break;
       case Primitive::Type::Text:
-        draw_list->AddText(p1, p.color, p.text.c_str());
+        if (p.font_size > 0.f) {
+          draw_list->AddText(nullptr, p.font_size, p1, p.color, p.text.c_str());
+        } else {
+          draw_list->AddText(p1, p.color, p.text.c_str());
+        }
         break;
     }
   }

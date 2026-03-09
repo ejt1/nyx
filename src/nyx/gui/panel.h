@@ -61,6 +61,7 @@ class PanelWidget : public Widget {
   static void SetTitle(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void GetFlags(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void SetFlags(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void GetVisible(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void GetCanvas(const v8::FunctionCallbackInfo<v8::Value>& args);
 
   void Render() override;

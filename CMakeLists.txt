@@ -1,7 +1,12 @@
+cmake_minimum_required(VERSION 3.22)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
 project(nyx)
 
-add_subdirectory(tools)
 add_subdirectory(vendor)
+add_subdirectory(tools)
 
 # TODO: make optional
 add_subdirectory(dolos)
